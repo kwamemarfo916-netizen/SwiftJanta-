@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buy Mashup Packs — SwiftJanta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="swiftjanta.css">
+</head>
+<body>
+
+<div id="gate">Loading…</div>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a href="dashboard.html" class="back-link">← Dashboard</a>
+      <span class="wordmark">Swift<span>Janta</span></span>
+      <button class="logout-btn" id="logout-btn" type="button">Log out</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="balance-strip">
+      <span>Wallet balance</span>
+      <span class="amount mono" id="balance-amount">GHS 0.00</span>
+    </div>
+
+    <h1 class="page-title">Buy Mashup Packs</h1>
+    <p class="page-sub">Voice + data + SMS combo packs — pick a network to see today's plans.</p>
+
+    <div class="card">
+      <div id="form-error" class="form-error" role="alert" hidden></div>
+      <div id="form-success" class="form-success" role="status" hidden></div>
+
+      <form id="purchase-form" novalidate>
+        <span class="group-label">Network</span>
+        <div class="chip-group" id="network-chips" role="group" aria-label="Network">
+          <button type="button" class="chip" data-network="mtn">MTN</button>
+          <button type="button" class="chip" data-network="airteltigo">AirtelTigo</button>
+          <button type="button" class="chip" data-network="telecel">Telecel</button>
+        </div>
+
+        <span class="group-label">Plan</span>
+        <div class="plan-list" id="plan-list">
+          <div class="empty-state">Choose a network to see plans.</div>
+        </div>
+
+        <div class="field">
+          <label for="phone">Recipient phone number</label>
+          <input type="tel" id="phone" required placeholder="024 123 4567" autocomplete="tel">
+        </div>
+
+        <div class="summary-row total">
+          <span>Total</span>
+          <span class="mono" id="summary-total">GHS 0.00</span>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn-primary" disabled>Buy Mashup Pack</button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import { requireAuth, watchBalance, wireLogout, createOrder, loadProducts, escapeHtml } from './swiftjanta-app.js';
+
+  let uid = null;
+  let currentBalance = 0;
+  let selectedNetwork = null;
+  let selectedPlan = null; // { id, name, sellPriceGHS }
+
+  const networkChips = document.querySelectorAll('#network-chips .chip');
+  const planList      = document.getElementById('plan-list');
+  const phoneInput    = document.getElementById('phone');
+  const summaryTotal  = document.getElementById('summary-total');
+  const submitBtn     = document.getElementById('submit-btn');
+  const formError     = document.getElementById('form-error');
+  const formSuccess   = document.getElementById('form-success');
+  const form          = document.getElementById('purchase-form');
+  const balanceEl     = document.getElementById('balance-amount');
+
+  wireLogout('logout-btn');
+
+  networkChips.forEach(chip => chip.addEventListener('click', async () => {
+    networkChips.forEach(c => c.classList.remove('is-active'));
+    chip.classList.add('is-active');
+    selectedNetwork = chip.dataset.network;
+    selectedPlan = null;
+    updateState();
+    await renderPlans();
+  }));
+
+  phoneInput.addEventListener('input', updateState);
+
+  async function renderPlans(){
+    planList.innerHTML = '<div class="empty-state">Loading plans…</div>';
+    let products = [];
+    try {
+      products = await loadProducts('mashup', selectedNetwork);
+    } catch (err) {
+      planList.innerHTML = '<div class="empty-state">Couldn\'t load plans right now.</div>';
+      console.error(err);
+      return;
+    }
+    if (!products.length) {
+      planList.innerHTML = '<div class="empty-state">No plans listed for this network yet.</div>';
+      return;
+    }
+    planList.innerHTML = products.map(p => `
+      <button type="button" class="plan-row" data-id="${p.id}" data-price="${p.sellPriceGHS}">
+        <span>
+          <span class="plan-name">${escapeHtml(p.name || 'Mashup Pack')}</span>
+        </span>
+        <span class="plan-price mono">GHS ${Number(p.sellPriceGHS).toFixed(2)}</span>
+      </button>
+    `).join('');
+    planList.querySelectorAll('.plan-row').forEach(row => {
+      row.addEventListener('click', () => {
+        planList.querySelectorAll('.plan-row').forEach(r => r.classList.remove('is-active'));
+        row.classList.add('is-active');
+        selectedPlan = {
+          id: row.dataset.id,
+          price: parseFloat(row.dataset.price),
+          name: row.querySelector('.plan-name').textContent
+        };
+        updateState();
+      });
+    });
+  }
+
+  function updateState(){
+    summaryTotal.textContent = 'GHS ' + (selectedPlan ? selectedPlan.price.toFixed(2) : '0.00');
+    submitBtn.disabled = !(selectedPlan && phoneInput.value.trim().length >= 9);
+  }
+
+  requireAuth((user) => {
+    document.getElementById('app').hidden = false;
+    uid = user.uid;
+    watchBalance(uid, (balance) => {
+      currentBalance = balance;
+      balanceEl.textContent = 'GHS ' + balance.toFixed(2);
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    formError.hidden = true;
+    formSuccess.hidden = true;
+
+    if (selectedPlan.price > currentBalance) {
+      formError.textContent = 'Your wallet balance is lower than this plan — top up first.';
+      formError.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Placing order…';
+    try {
+      await createOrder({
+        uid, productType: 'mashup', network: selectedNetwork,
+        recipientPhone: phoneInput.value.trim(), amountGHS: selectedPlan.price
+      });
+      formSuccess.textContent = "Order placed — it'll be processed and delivered shortly.";
+      formSuccess.hidden = false;
+      form.reset();
+      networkChips.forEach(c => c.classList.remove('is-active'));
+      planList.innerHTML = '<div class="empty-state">Choose a network to see plans.</div>';
+      selectedNetwork = null;
+      selectedPlan = null;
+    } catch (err) {
+      formError.textContent = 'Something went wrong placing that order. Try again.';
+      formError.hidden = false;
+      console.error(err);
+    } finally {
+      submitBtn.textContent = 'Buy Mashup Pack';
+      updateState();
+    }
+  });
+</script>
+</body>
+        </html>
+  
