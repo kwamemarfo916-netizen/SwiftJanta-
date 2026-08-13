@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — SwiftJanta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#0B0B0F; --black-2:#17171D; --paper:#F5F6FA;
+    --blue:#2F6FED; --blue-bright:#4F8AFF; --green:#22935F;
+    --red:#D64545; --ink:#14141A; --mist:#8A90A3; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Inter', sans-serif; background:var(--paper); color:var(--ink); min-height:100vh;}
+  .mono{font-family:'JetBrains Mono', monospace;}
+  a{color:inherit; text-decoration:none;}
+
+  #gate{
+    position:fixed; inset:0; background:var(--black); color:var(--mist);
+    display:flex; align-items:center; justify-content:center; font-size:0.9rem; z-index:100;
+  }
+
+  .topbar{background:var(--black); padding:1.1rem 1.5rem;}
+  .topbar-inner{max-width:960px; margin:0 auto; display:flex; align-items:center; justify-content:space-between;}
+  .wordmark{font-family:'Space Grotesk',sans-serif; font-weight:700; color:var(--white); font-size:1.15rem;}
+  .wordmark span{color:var(--blue);}
+  .user-area{display:flex; align-items:center; gap:1rem;}
+  .user-name{color:var(--mist); font-size:0.85rem; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .logout-btn{
+    background:transparent; border:1px solid rgba(255,255,255,0.2); color:var(--white);
+    padding:0.5rem 1rem; border-radius:999px; font-size:0.82rem; font-weight:600; cursor:pointer;
+    transition:border-color 0.15s ease;
+  }
+  .logout-btn:hover{border-color:var(--white);}
+
+  main{max-width:960px; margin:0 auto; padding:2rem 1.25rem 4rem;}
+
+  .balance-card{
+    background:linear-gradient(135deg, var(--black) 0%, var(--black-2) 100%);
+    border-radius:20px; padding:1.75rem 1.5rem; color:var(--white);
+    margin-bottom:1.75rem;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1.25rem;
+  }
+  .balance-label{font-size:0.8rem; color:var(--mist); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.4rem;}
+  .balance-amount{font-size:2.1rem; font-weight:700;}
+  .topup-btn{
+    background:var(--blue); color:var(--white); border:none; padding:0.75rem 1.4rem;
+    border-radius:999px; font-weight:700; font-size:0.9rem; cursor:pointer;
+    transition:background 0.15s ease; display:inline-block;
+  }
+  .topup-btn:hover{background:var(--blue-bright);}
+
+  section{margin-bottom:2.25rem;}
+  .section-title{font-family:'Space Grotesk',sans-serif; font-size:1.15rem; margin-bottom:1rem;}
+
+  .services-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.85rem;}
+  .service-tile{
+    background:var(--white); border-radius:14px; padding:1.1rem 0.9rem;
+    text-align:center; border:1px solid rgba(16,24,43,0.06);
+    transition:transform 0.15s ease, box-shadow 0.15s ease; display:block;
+  }
+  .service-tile:hover{transform:translateY(-2px); box-shadow:0 10px 20px -12px rgba(16,24,43,0.25);}
+  .service-icon{font-size:1.5rem; margin-bottom:0.5rem;}
+  .service-label{font-size:0.85rem; font-weight:600;}
+
+  .activity-list{background:var(--white); border-radius:16px; overflow:hidden; border:1px solid rgba(16,24,43,0.06);}
+  .activity-row{
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    padding:1rem 1.25rem; border-bottom:1px solid rgba(16,24,43,0.06);
+  }
+  .activity-row:last-child{border-bottom:none;}
+  .activity-main{display:flex; flex-direction:column; gap:0.2rem; min-width:0;}
+  .activity-type{font-weight:600; font-size:0.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .activity-date{font-size:0.78rem; color:var(--mist);}
+  .activity-right{text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:0.3rem; flex-shrink:0;}
+  .activity-amount{font-weight:600; font-size:0.92rem;}
+  .status-pill{font-size:0.7rem; font-weight:700; padding:0.2rem 0.55rem; border-radius:999px; text-transform:uppercase; letter-spacing:0.03em;}
+  .status-completed{background:rgba(34,147,95,0.12); color:var(--green);}
+  .status-pending{background:rgba(138,144,163,0.18); color:var(--mist);}
+  .status-failed{background:rgba(214,69,69,0.12); color:var(--red);}
+
+  .empty-state{padding:2.5rem 1.5rem; text-align:center; color:var(--mist); font-size:0.9rem;}
+
+  :focus-visible{outline:2px solid var(--blue-bright); outline-offset:2px;}
+
+  @media (max-width:520px){
+    .balance-card{flex-direction:column; align-items:flex-start;}
+    .topup-btn{width:100%; text-align:center;}
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">Loading…</div>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <span class="wordmark">Swift<span>Janta</span></span>
+      <div class="user-area">
+        <span class="user-name" id="user-name"></span>
+        <button class="logout-btn" id="logout-btn" type="button">Log out</button>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <div class="balance-card">
+      <div>
+        <p class="balance-label">Wallet balance</p>
+        <p class="balance-amount mono" id="balance-amount">GHS 0.00</p>
+      </div>
+      <a href="topup.html" class="topup-btn">Top up</a>
+    </div>
+
+    <section>
+      <h2 class="section-title">Services</h2>
+      <div class="services-grid">
+        <a href="buy-airtime.html" class="service-tile"><div class="service-icon">📱</div><div class="service-label">Airtime</div></a>
+        <a href="buy-bundle.html" class="service-tile"><div class="service-icon">📶</div><div class="service-label">Data Bundles</div></a>
+        <a href="buy-mashup.html" class="service-tile"><div class="service-icon">🎁</div><div class="service-label">Mashup Packs</div></a>
+        <a href="buy-sms.html" class="service-tile"><div class="service-icon">💬</div><div class="service-label">SMS Bundles</div></a>
+        <a href="transfer.html" class="service-tile"><div class="service-icon">💸</div><div class="service-label">Send Money</div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Recent activity</h2>
+      <div class="activity-list" id="activity-list">
+        <div class="empty-state">Loading activity…</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+  import {
+    getFirestore, doc, onSnapshot,
+    collection, query, where, orderBy, limit, getDocs
+  } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBsc21SzOKkxIcGBfv0gAC5g4x-hZ7DQU0",
+    authDomain: "swiftjanta-fcaf9.firebaseapp.com",
+    projectId: "swiftjanta-fcaf9",
+    storageBucket: "swiftjanta-fcaf9.firebasestorage.app",
+    messagingSenderId: "515717504429",
+    appId: "1:515717504429:web:89260041f7f353e4f3d524",
+    measurementId: "G-SB86ZNN11Q"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const gate = document.getElementById('gate');
+  const appEl = document.getElementById('app');
+  const userNameEl = document.getElementById('user-name');
+  const balanceEl = document.getElementById('balance-amount');
+  const activityList = document.getElementById('activity-list');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  logoutBtn.addEventListener('click', async () => {
+    await signOut(auth);
+    window.location.href = 'login.html';
+  });
+
+  onAuthStateChanged(auth, (user) => {
+    const isGoogleUser = user && user.providerData.some(p => p.providerId === 'google.com');
+    if (!user || (!user.emailVerified && !isGoogleUser)) {
+      window.location.href = 'login.html';
+      return;
+    }
+    gate.hidden = true;
+    appEl.hidden = false;
+    userNameEl.textContent = user.displayName || user.email;
+    watchBalance(user.uid);
+    loadActivity(user.uid);
+  });
+
+  function watchBalance(uid){
+    onSnapshot(doc(db, 'users', uid), (snap) => {
+      const data = snap.data();
+      const balance = data && typeof data.walletBalance === 'number' ? data.walletBalance : 0;
+      balanceEl.textContent = 'GHS ' + balance.toFixed(2);
+    }, () => { balanceEl.textContent = 'GHS 0.00'; });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function timeAgo(date){
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    const units = [['year',31536000],['month',2592000],['day',86400],['hour',3600],['minute',60]];
+    for (const [name, secs] of units) {
+      const val = Math.floor(seconds / secs);
+      if (val >= 1) return val + ' ' + name + (val > 1 ? 's' : '') + ' ago';
+    }
+    return 'just now';
+  }
+
+  const productLabels = {
+    airtime: 'Airtime purchase', bundle: 'Data bundle', mashup: 'Mashup pack', sms: 'SMS bundle'
+  };
+
+  // NOTE: these two queries (equality + orderBy on a different field) need a
+  // Firestore composite index. The first time this runs, the browser console
+  // will show an error with a direct link that creates it automatically.
+  async function loadActivity(uid){
+    try {
+      const ordersQ = query(collection(db, 'orders'), where('userId', '==', uid), orderBy('createdAt', 'desc'), limit(8));
+      const transfersQ = query(collection(db, 'transfers'), where('senderId', '==', uid), orderBy('createdAt', 'desc'), limit(8));
+      const [ordersSnap, transfersSnap] = await Promise.all([getDocs(ordersQ), getDocs(transfersQ)]);
+
+      const items = [];
+      ordersSnap.forEach(d => {
+        const o = d.data();
+        items.push({
+          label: productLabels[o.productType] || 'Purchase',
+          amount: o.amountGHS, status: o.status,
+          date: o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : new Date()
+        });
+      });
+      transfersSnap.forEach(d => {
+        const t = d.data();
+        items.push({
+          label: 'Sent to ' + escapeHtml(t.recipientPhone || 'recipient'),
+          amount: t.amountGHS, status: t.status,
+          date: t.createdAt && t.createdAt.toDate ? t.createdAt.toDate() : new Date()
+        });
+      });
+
+      items.sort((a, b) => b.date - a.date);
+      renderActivity(items.slice(0, 8));
+    } catch (err) {
+      activityList.innerHTML = '<div class="empty-state">Couldn\'t load activity right now.</div>';
+      console.error(err);
+    }
+  }
+
+  function renderActivity(items){
+    if (!items.length) {
+      activityList.innerHTML = '<div class="empty-state">No transactions yet — make your first purchase above.</div>';
+      return;
+    }
+    activityList.innerHTML = items.map(item => `
+      <div class="activity-row">
+        <div class="activity-main">
+          <span class="activity-type">${item.label}</span>
+          <span class="activity-date">${timeAgo(item.date)}</span>
+        </div>
+        <div class="activity-right">
+          <span class="activity-amount mono">GHS ${Number(item.amount || 0).toFixed(2)}</span>
+          <span class="status-pill status-${item.status}">${item.status}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+</script>
+</body>
+</html>
