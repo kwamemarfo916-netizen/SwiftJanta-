@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Send Money — SwiftJanta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="swiftjanta.css">
+</head>
+<body>
+
+<div id="gate">Loading…</div>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a href="dashboard.html" class="back-link">← Dashboard</a>
+      <span class="wordmark">Swift<span>Janta</span></span>
+      <button class="logout-btn" id="logout-btn" type="button">Log out</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="balance-strip">
+      <span>Wallet balance</span>
+      <span class="amount mono" id="balance-amount">GHS 0.00</span>
+    </div>
+
+    <h1 class="page-title">Send Money</h1>
+    <p class="page-sub">Transfer straight to any mobile money wallet.</p>
+
+    <div class="card">
+      <div id="form-error" class="form-error" role="alert" hidden></div>
+      <div id="form-success" class="form-success" role="status" hidden></div>
+
+      <form id="purchase-form" novalidate>
+        <span class="group-label">Recipient's network</span>
+        <div class="chip-group" id="network-chips" role="group" aria-label="Mobile money network">
+          <button type="button" class="chip" data-network="mtn">MTN MoMo</button>
+          <button type="button" class="chip" data-network="airteltigo">AirtelTigo Money</button>
+          <button type="button" class="chip" data-network="telecel">Telecel Cash</button>
+        </div>
+
+        <div class="field">
+          <label for="phone">Recipient mobile money number</label>
+          <input type="tel" id="phone" required placeholder="024 123 4567" autocomplete="tel">
+        </div>
+
+        <div class="field">
+          <label for="amount">Amount (GHS)</label>
+          <input type="number" id="amount" min="1" step="0.5" placeholder="e.g. 50" required>
+        </div>
+
+        <div class="summary-row">
+          <span>Transfer fee</span>
+          <span class="mono">GHS 2.00</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total</span>
+          <span class="mono" id="summary-total">GHS 0.00</span>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn-primary" disabled>Send Money</button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import { requireAuth, watchBalance, wireLogout, createTransfer } from './swiftjanta-app.js';
+
+  const FEE = 2;
+
+  let uid = null;
+  let currentBalance = 0;
+  let selectedNetwork = null;
+
+  const networkChips = document.querySelectorAll('#network-chips .chip');
+  const phoneInput    = document.getElementById('phone');
+  const amountInput   = document.getElementById('amount');
+  const summaryTotal  = document.getElementById('summary-total');
+  const submitBtn     = document.getElementById('submit-btn');
+  const formError     = document.getElementById('form-error');
+  const formSuccess   = document.getElementById('form-success');
+  const form          = document.getElementById('purchase-form');
+  const balanceEl     = document.getElementById('balance-amount');
+
+  wireLogout('logout-btn');
+
+  networkChips.forEach(chip => chip.addEventListener('click', () => {
+    networkChips.forEach(c => c.classList.remove('is-active'));
+    chip.classList.add('is-active');
+    selectedNetwork = chip.dataset.network;
+    updateState();
+  }));
+
+  function totalAmount(){
+    const amt = parseFloat(amountInput.value) || 0;
+    return amt > 0 ? amt + FEE : 0;
+  }
+
+  function updateState(){
+    summaryTotal.textContent = 'GHS ' + totalAmount().toFixed(2);
+    const amt = parseFloat(amountInput.value) || 0;
+    submitBtn.disabled = !(selectedNetwork && amt > 0 && phoneInput.value.trim().length >= 9);
+  }
+  phoneInput.addEventListener('input', updateState);
+  amountInput.addEventListener('input', updateState);
+
+  requireAuth((user) => {
+    document.getElementById('app').hidden = false;
+    uid = user.uid;
+    watchBalance(uid, (balance) => {
+      currentBalance = balance;
+      balanceEl.textContent = 'GHS ' + balance.toFixed(2);
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    formError.hidden = true;
+    formSuccess.hidden = true;
+
+    const amt = parseFloat(amountInput.value) || 0;
+    const total = totalAmount();
+
+    if (total > currentBalance) {
+      formError.textContent = 'Your wallet balance (including the GHS 2 fee) is too low for this transfer.';
+      formError.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    try {
+      await createTransfer({
+        uid, recipientPhone: phoneInput.value.trim(), network: selectedNetwork, amountGHS: amt
+      });
+      formSuccess.textContent = "Transfer submitted — it'll reach the recipient's wallet shortly.";
+      formSuccess.hidden = false;
+      form.reset();
+      networkChips.forEach(c => c.classList.remove('is-active'));
+      selectedNetwork = null;
+    } catch (err) {
+      formError.textContent = 'Something went wrong sending that. Try again.';
+      formError.hidden = false;
+      console.error(err);
+    } finally {
+      submitBtn.textContent = 'Send Money';
+      updateState();
+    }
+  });
+</script>
+</body>
+    </html>
+                                    
